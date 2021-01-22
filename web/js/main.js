@@ -8,8 +8,11 @@
  * Licensed under MIT (https://coreui.io/license)
  * --------------------------------------------------------------------------
  */
-var intervalHandle = null;
 var totalCyclerCapacity = 2;
+var intervalHandles = [];
+for(i=0; i<totalCyclerCapacity; i++) {
+    intervalHandles.push(null);
+}
 var config_chart = [];
 var chart_slot = [];
 
@@ -201,20 +204,21 @@ $('.btn-submit').on('click', function() {
             }
             console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
 
-            cell_update_interval()
             $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item){
-
                 // Clear graphs for cell
                 if (chart_slot[idx].data['datasets'].length >= parseInt(item.value) ) {
                     clear_cell_chart(parseInt(item.value)-1)
                 }
 
                 console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
+                var slot_id = item.value -1;
                 $.ajax({
                     type: "POST",
-                    url: "api/"+func+"/"+(item.value-1),
+                    url: "api/"+func+"/"+slot_id,
                     data: serial,
                     success: function(response) {
+                        // Start internal and notify success
+                        cell_update_interval(slot_id);
                         alert_popup('success', response.message);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
@@ -275,7 +279,7 @@ $('.btn-submit').on('click', function() {
                     if ( typeof jqXHR.responseJSON == "object" ) {
                         alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
                     } else {
-                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+errorThrown)
+                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
                     }
                 });
             });
@@ -346,7 +350,7 @@ $('.btn-submit').on('click', function() {
                     if ( typeof jqXHR.responseJSON == "object" ) {
                         alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
                     } else {
-                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+errorThrown)
+                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
                     }
                 });
             });
@@ -372,7 +376,7 @@ $('.btn-submit').on('click', function() {
                     if ( typeof jqXHR.responseJSON == "object" ) {
                         alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
                     } else {
-                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+errorThrown)
+                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
                     }
                 });
             });
@@ -381,73 +385,74 @@ $('.btn-submit').on('click', function() {
 
 });
 
-    function stop_cell_interval() {
-        clearInterval(intervalHandle);
-        intervalHandle = null;
+function stop_cell_interval(slot_id) {
+    clearInterval(intervalHandles[slot_id]);
+    intervalHandles[slot_id] = null;
+}
+
+function cell_update_interval(slot_id){
+    if (intervalHandles[slot_id]) {
+        return;
     }
 
-    function cell_update_interval(){
-        if (intervalHandle) {
-            return;
-        }
-        intervalHandle = setInterval( function(){
-            $.ajax({
-                type: "POST",
-                url: "api/status",
-                data: JSON.stringify([{ "name": "action", "value": "status" }]),
-                success: function(response) {
-                    var date = new Date();
-                    //date.setSeconds(45); // specify value for SECONDS here
-                    var timeString = date.toISOString().substr(11, 8);
-                    console.log("cell_update_interval:"+timeString)
-                    //config_chart.data.labels.push(timeString);
-                    hasdata = false;
-                    for (const [slot_id, slot_data] of Object.entries(response)) {
-                    //$.each(response.message, function(slot_id, slot_data) {
-                        console.log("cell_update_interval data -> "+JSON.stringify(slot_data));
-                        // Not idle
-                        if ( Object.keys(slot_data).length > 0 ) {
-                            hasdata = true;
-                            add_slot_data_to_chart(slot_id, slot_data);
-                            const dateObject = new Date(slot_data['timestamp']*1000);
-                            config_chart[slot_id].data.labels.push(dateObject.toLocaleString());
-                        }
-
+    intervalHandles[slot_id] = setInterval( function(slot_id){
+        $.ajax({
+            type: "POST",
+            url: "api/status/"+slot_id,
+            data: JSON.stringify([{ "name": "action", "value": "status" }]),
+            success: function(slot_data) {
+                var date = new Date();
+                //date.setSeconds(45); // specify value for SECONDS here
+                var timeString = date.toISOString().substr(11, 8);
+                console.log("cell_update_interval:"+timeString)
+                //config_chart.data.labels.push(timeString);
+                hasdata = false;
+                //for (const [slot_id, slot_data] of Object.entries(response)) {
+                //$.each(response.message, function(slot_id, slot_data) {
+                    console.log("cell_update_interval data -> "+JSON.stringify(slot_data));
+                slot_data.forEach(function(data, sid) {
+                    if ( Object.keys(data).length > 0 ) {
+                        hasdata = true;
+                        add_slot_data_to_chart(sid, data);
+                        const dateObject = new Date(slot_data['timestamp']*1000);
+                        config_chart[sid].data.labels.push(dateObject.toLocaleString());
                     }
-                    //window.chart_slot.update();
-                    if  (hasdata == false) {
-                      stop_cell_interval()
-                    }
+                });
 
+                if  (hasdata == false) {
+                    stop_cell_interval(slot_id)
                 }
-            }).fail( function(jqXHR, textStatus, errorThrown) {
-                if ( typeof jqXHR.responseJSON == "object" ) {
-                    alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
-                } else {
-                    alert_popup('danger', "Status: "+jqXHR.status+" Error: "+errorThrown)
-                }
-            });
-        }, 1000);
-    }
-    function addCellData(k, v) {
-        // cell data
-        $('.voltage .cell'+v['id']+'.text-value').text(v['voltage']);
-        $('.watthours .cell'+v['id']+'.text-value').text(v['watthours']);
-        $('.current .cell'+v['id']+'.text-value').text(v['current']);
-        $('.temp .cell'+v['id']+'.text-value').text(v['temp']);
-        $('.amphours .cell'+v['id']+'.text-value').text(v['amphours']);
-    }
 
-    function add_slot_data_to_chart(slot_id, data) {
-        // Add data to cell charts
-        addCellData(slot_id, data);
-        // Voltage line
-        chart_slot[slot_id].data['datasets'][0]['data'].push(data['voltage']);
-        chart_slot[slot_id].data['datasets'][1]['data'].push(data['current']);
-        const dateObject = new Date(data['timestamp']*1000);
+            }
+        }).fail( function(jqXHR, textStatus, errorThrown) {
+            if ( typeof jqXHR.responseJSON == "object" ) {
+                alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
+            } else {
+                alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
+            }
+        });
+    }, 1000, slot_id);
+}
 
-        chart_slot[slot_id].update();
-    }
+function addCellData(k, v) {
+    // cell data
+    $('.voltage .cell'+v['id']+'.text-value').text(v['voltage']);
+    $('.watthours .cell'+v['id']+'.text-value').text(v['watthours']);
+    $('.current .cell'+v['id']+'.text-value').text(v['current']);
+    $('.temp .cell'+v['id']+'.text-value').text(v['temp']);
+    $('.amphours .cell'+v['id']+'.text-value').text(v['amphours']);
+}
+
+function add_slot_data_to_chart(slot_id, data) {
+    // Add data to cell charts
+    addCellData(slot_id, data);
+    // Voltage line
+    chart_slot[slot_id].data['datasets'][0]['data'].push(data['voltage']);
+    chart_slot[slot_id].data['datasets'][1]['data'].push(data['current']);
+    const dateObject = new Date(data['timestamp']*1000);
+
+    chart_slot[slot_id].update();
+}
 
 
 
@@ -460,24 +465,24 @@ $('.btn-submit').on('click', function() {
     });
 */
 
-    $('#status').on('click', function() {
-        cell_update_interval();
-    });
+//    $('#status').on('click', function() {
+//        cell_update_interval();
+//    });
 
-    $('#status_stop').on('click', function() {
-        // stop_cell_interval()
-        var slot_id = 0;
-        $.ajax({
-            type: "POST",
-            url: "api/history/"+slot_id,
-            data: '[{"name":"action","value":"history"}]',
-            success: function(response) {
+$('#status_stop').on('click', function() {
+    // stop_cell_interval()
+    var slot_id = 0;
+    $.ajax({
+        type: "POST",
+        url: "api/history/"+slot_id,
+        data: '[{"name":"action","value":"history"}]',
+        success: function(response) {
 //                console.log(response.message);
-                $.each(response.message, function(_, values) {
-                    add_slot_data_to_chart(slot_id, values);
-                });
-            }
-        });
+            $.each(response.message, function(_, values) {
+                add_slot_data_to_chart(slot_id, values);
+            });
+        }
     });
+});
 
 

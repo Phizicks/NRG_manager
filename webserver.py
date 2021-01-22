@@ -27,7 +27,7 @@ def is_comms_busy():
 
     :return:
     """
-    if not cyclerqueue.empty():
+    if not cyclerqueue.empty() and len(cyclerqueue.queue) > 2:
         logging.debug("Cycler queue too busy: Empty? '{}'".format(cyclerqueue.empty()))
         logging.debug("Queue content: {}".format(list(cyclerqueue.queue)))
         return True
@@ -75,8 +75,8 @@ def send_css(path):
     return send_from_directory('web/css', path)
 
 
-@app.route('/api/status', methods=['POST'])
-def api_status(slot_id=0):
+@app.route('/api/status/<int:slot_id>', methods=['POST'])
+def api_status(slot_id):
     """
 
     :return:
@@ -86,7 +86,7 @@ def api_status(slot_id=0):
     if is_comms_busy():
         return Response("Comms service too busy", status=429)
 
-    cyclerqueue.put({'action': 'status', 'payload': payload})
+    cyclerqueue.put({'slot_id': slot_id, 'action': 'status', 'payload': payload})
     return wait_and_get_response()
 
 
@@ -132,7 +132,6 @@ def history(slot_id):
 
 
 def format_request(payload: dict):
-    logging.critical(payload)
     return {item['name']: item['value'] for item in payload}
 
 

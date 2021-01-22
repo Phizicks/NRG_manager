@@ -313,12 +313,12 @@ class Cycler(threading.Thread):
     def get_slot_history(self, slot_id):
         return [c.to_json for c in self.slots[slot_id].get_history()]
 
-    def get_slots_status(self):
+    def get_slots_status(self, slot_id):
         return self.webqueue.put({
             "message": json.dumps([
                 self.slots[slot_id].get_history()[-1].to_json
                 if len(self.slots[slot_id].get_history()) > 0 and self.slots[slot_id].state != State.idle else []
-                for slot_id in range(0, self.total_slots)]),
+            ]),
             "code": 200,
             "mimetype": "application/json"
         })
@@ -336,7 +336,7 @@ class Cycler(threading.Thread):
                     {
                         "message": "Slot {} is not idle".format(slot_id),
                         "code": 400,
-                        "mimetype": "application/json"
+                        "mimetype": "html/text"
                     })
         else:
             self.slots[slot_id].state = State.charging
@@ -350,7 +350,7 @@ class Cycler(threading.Thread):
                     {
                         "message": "Started charge on Slot {} with settings:{}".format(slot_id, settings),
                         "code": 200,
-                        "mimetype": "application/json"
+                        "mimetype": "html/text"
                     })
 
     def respond(self, message, code=200):
@@ -389,7 +389,7 @@ class Cycler(threading.Thread):
         # _______________
         match = re.search(r'> Cell (\d+) OVT, stopping', line)
         if match:
-            slot_id = int(match.group(1)) - 1  # TODO zero base slots
+            slot_id = int(match.group(1))  # TODO zero base slots
             self.slots[slot_id].state = State.idle
             self.log.info("{}Slot{} is now IDLE{}".format(cGreen, slot_id, cNorm))
             return
@@ -488,9 +488,10 @@ class Cycler(threading.Thread):
                                     "code": 200,
                                     "mimetype": "application/json"
                                 })
-                    elif action == "status":  # and self.is_valid_slot(slot_id):
+                    elif action == "status":
                         # self.get_slots_status(payload['lasttimestamp'])
-                        self.get_slots_status()
+
+                        self.get_slots_status(slot_id)
                     elif action == "charge":
                         self.is_valid_slot(slot_id)
                         self.charge_slot(slot_id, payload)
@@ -605,7 +606,7 @@ class Cycler(threading.Thread):
             return self.respond("Cell {} not idle".format(cellid + 1), 400)
         else:
             self.slots[cellid].state = 'cycle'
-            self.slots[cellid]._cycle_total = int(data['cycles'] if data['cycles'] != "" else 1)
+            self.slots[cellid].cycle_total = int(data['cycles'] if data['cycles'] != "" else 1)
             self.log.info("Cycle start on Cell {} settings:{}".format(cellid + 1, settings))
             self.device.sendline("n{}\n".format(cellid + 1))
             time.sleep(0.1)
@@ -624,9 +625,8 @@ class Cycler(threading.Thread):
             return self.respond("Cell {} is already idle".format(cellid + 1), 400)
         else:
             self.device.sendline("n{}\n".format(cellid + 1))
-            self.log.info("Stopping Cell {} currently:{}".format(cellid + 1,
-                                                                 self.slots[cellid].state))
-            self.slots[cellid].set_state('idle')
+            self.log.info("Stopping Cell {} currently:{}".format(cellid + 1, self.slots[cellid].state))
+            self.slots[cellid].state = State.idle
             return self.respond("Stopping Cell {}".format(cellid + 1), 200)
 
     def api_status(self, cellid, params):
