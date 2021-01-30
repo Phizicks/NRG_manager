@@ -2,6 +2,7 @@ import json
 import logging
 import queue
 import time
+import uuid
 
 from flask import Flask, send_from_directory
 from flask import Response, request
@@ -17,9 +18,15 @@ cCyan = "\033[36m"
 cNorm = "\033[0m"
 
 cyclerqueue = queue.Queue()
-webqueue = queue.Queue()
+webqueue = {}
 
 app = Flask(__name__)
+
+
+def get_request():
+    rid = str(uuid.uuid4())
+    webqueue[rid] = queue.Queue()
+    return rid
 
 
 def is_comms_busy():
@@ -27,21 +34,22 @@ def is_comms_busy():
 
     :return:
     """
-    if not cyclerqueue.empty() and len(cyclerqueue.queue) > 2:
+    if not cyclerqueue.empty() and len(cyclerqueue.queue) > 20:
         logging.debug("Cycler queue too busy: Empty? '{}'".format(cyclerqueue.empty()))
         logging.debug("Queue content: {}".format(list(cyclerqueue.queue)))
         return True
 
 
-def wait_and_get_response():
+def wait_and_get_response(rid):
     """
 
     :return:
     """
-    while webqueue.empty():
+    while webqueue[rid].empty():
         time.sleep(0.5)
-    response = webqueue.get()
-    webqueue.task_done()
+    response = webqueue[rid].get()
+    webqueue[rid].task_done()
+    del webqueue[rid]
     return Response(response['message'], status=response['code'], mimetype=response['mimetype'])
 
 
@@ -86,8 +94,25 @@ def api_status(slot_id):
     if is_comms_busy():
         return Response("Comms service too busy", status=429)
 
-    cyclerqueue.put({'slot_id': slot_id, 'action': 'status', 'payload': payload})
-    return wait_and_get_response()
+    rid = get_request()
+    cyclerqueue.put({'slot_id': slot_id, 'action': 'status', 'payload': payload, 'request_id': rid})
+    return wait_and_get_response(rid)
+
+
+@app.route('/api/stop/<int:slot_id>', methods=['POST'])
+def api_stop(slot_id):
+    """
+
+    :return:
+    """
+    payload = json.loads(request.stream.read().decode('utf-8'))
+    logging.info("{}Requested: {} {}{}".format(cMag, request.path, payload, cNorm))
+    if is_comms_busy():
+        return Response("Comms service too busy", status=429)
+
+    rid = get_request()
+    cyclerqueue.put({'slot_id': slot_id, 'action': 'stop', 'payload': payload, 'request_id': rid})
+    return wait_and_get_response(rid)
 
 
 @app.route('/api/charge/<int:slot_id>', methods=['POST'])
@@ -102,8 +127,10 @@ def api_charge(slot_id):
     if is_comms_busy():
         return Response("Comms service too busy", status=429)
 
-    cyclerqueue.put({'slot_id': slot_id, 'action': 'charge', 'payload': format_request(payload)})
-    return wait_and_get_response()
+    rid = get_request()
+    cyclerqueue.put(
+            {'slot_id': slot_id, 'action': 'charge', 'payload': format_request(payload), 'request_id': rid})
+    return wait_and_get_response(rid)
 
 
 @app.route('/', methods=['GET'])
@@ -127,8 +154,9 @@ def history(slot_id):
     if is_comms_busy():
         return Response("Comms service too busy", status=429)
 
-    cyclerqueue.put({'slot_id': slot_id, 'action': 'history', 'payload': '{}'})
-    return wait_and_get_response()
+    rid = get_request()
+    cyclerqueue.put({'slot_id': slot_id, 'action': 'history', 'payload': '{}', 'request_id': rid})
+    return wait_and_get_response(rid)
 
 
 def format_request(payload: dict):

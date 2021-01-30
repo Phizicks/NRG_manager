@@ -20,7 +20,7 @@ if __name__ == "__main__":
     comsevent = threading.Event()
 
     # message Queues
-    webqueue = queue.Queue()
+    webqueue = {} #queue.Queue()
     cyclerqueue = queue.Queue()
     webserver.cyclerqueue = cyclerqueue
     webserver.webqueue = webqueue

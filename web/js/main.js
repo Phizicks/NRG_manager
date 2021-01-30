@@ -9,12 +9,8 @@
  * --------------------------------------------------------------------------
  */
 var totalCyclerCapacity = 2;
-var intervalHandles = [];
-for(i=0; i<totalCyclerCapacity; i++) {
-    intervalHandles.push(null);
-}
-var config_chart = [];
-var chart_slot = [];
+var intervalHandles = Array();
+var charts = Array();
 
 /* eslint-disable no-magic-numbers */
 // Disable the on-canvas tooltip
@@ -24,13 +20,11 @@ Chart.defaults.global.tooltips.mode = 'index';
 Chart.defaults.global.tooltips.position = 'nearest';
 //Chart.defaults.global.tooltips.custom = CustomTooltips; // eslint-disable-next-line no-unused-vars
 
-
-var config_chart_tpl = {
+const config = {
     type: 'line',
     data: {
         labels: [],
         datasets: [{
-            yAxisID: 'slot0',
             cellid: 1,
             label: 'mV',
             backgroundColor: '#c04040',
@@ -38,7 +32,6 @@ var config_chart_tpl = {
             data: [],
             fill: false,
         }, {
-            yAxisID: 'slot1',
             cellid: 2,
             label: 'mA',
             fill: false,
@@ -64,15 +57,15 @@ var config_chart_tpl = {
             intersect: true
         },
         scales: {
-            xAxes: [{
+            xAxis: [{
                 display: true,
                 scaleLabel: {
                     display: true,
                     labelString: 'Time'
                 }
             }],
-            yAxes: [{
-                id: 'slot0',
+            yAxis: [{
+                id: 'y-axis-1',
                 position: 'left',
                 ticks: {
                     beginAtZero: true
@@ -83,7 +76,7 @@ var config_chart_tpl = {
                     labelString: 'mV'
                 }
                }, {
-                id: 'slot1',
+                id: 'y-axis-2',
                 position: 'right',
                 ticks: {
                     beginAtZero: false,
@@ -97,34 +90,18 @@ var config_chart_tpl = {
             }]
         }
     }
-};
+}
 
 
-window.onload = function() {
-    var ctx_millivolt = document.getElementById('chart-millivolt').getContext('2d');
+$(document).ready(function() {
+    var configs = [];
     for(slot_id=0; slot_id<totalCyclerCapacity; slot_id++) {
-        config_chart.push(config_chart_tpl);
-        chart_slot.push(new Chart(ctx_millivolt, config_chart[slot_id]));
+        intervalHandles.push(null);
+        configs[slot_id] = JSON.parse(JSON.stringify(config));
+        charts[slot_id] = new Chart(document.getElementById('chart'+slot_id).getContext('2d'), configs[slot_id]);
     }
-};
+});
 
-var brandBoxChartLabels = ['January', 'February', 'March', 'April', 'May', 'June', 'July'];
-
-function dataset(cellid) {
-    return {
-      label: 'Cell#'+ (cellid.toString()),
-      backgroundColor: 'rgba(255,255,255,.1)',
-      borderColor: 'rgba(255,255,255,.55)',
-      pointHoverBackgroundColor: '#fff',
-      borderWidth: 2,
-      data: []
-    }
-}
-
-var loadDataSet = []
-for(i=0; i<totalCyclerCapacity; i++) {
-    loadDataSet.push(dataset(i))
-}
 
 // Left navbar menu drop down
 $('.nav-dropdown-toggle').on('click', function() {
@@ -171,10 +148,8 @@ function alert_popup(type, message) {
 
 function clear_cell_chart(slot_id) {
     console.log("Clearing slot #", slot_id);
-    config_chart[slot_id].data.datasets[0].data = [];
-    config_chart[slot_id].data.datasets[1].data = [];
-    config_chart[slot_id].data.labels = [];
-    chart_slot[slot_id].update();
+    charts[slot_id].clear();
+    charts[slot_id].update();
 }
 
 $('.btn-submit').on('click', function() {
@@ -202,31 +177,20 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "'Cutoff Current' outside of range [50 >= value <= 250]");
                 return;
             }
-            console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
 
             $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item){
-                // Clear graphs for cell
-                if (chart_slot[idx].data['datasets'].length >= parseInt(item.value) ) {
-                    clear_cell_chart(parseInt(item.value)-1)
-                }
-
-                console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
-                var slot_id = item.value -1;
+                var slot_id = parseInt(item.value) - 1;
                 $.ajax({
                     type: "POST",
-                    url: "api/"+func+"/"+slot_id,
+                    url: "api/charge/" + slot_id,
                     data: serial,
                     success: function(response) {
                         // Start internal and notify success
                         cell_update_interval(slot_id);
-                        alert_popup('success', response.message);
+                        alert_popup('success', response);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
-                    if ( typeof jqXHR.responseJSON == "object" ) {
-                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
-                    } else {
-                        alert_popup('danger', "Status: "+jqXHR.status+" Error: "+errorThrown)
-                    }
+                    alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
                 });
             });
 
@@ -257,23 +221,23 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "'Mode' must be of Constant Current or Stepped mode");
                 return;
             }
-            console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
-            cell_update_interval()
             $(this).closest('form').find('[name="cell"]:checked').each(function(slot_id, item){
 
                 // Clear graphs for cell
-                if (chart_slot[slot_id].data['datasets'].length > parseInt(item.value) ) {
-                    config_chart[slot_id].data.datasets[parseInt(item.value)-1].data = [];
-                    config_chart[slot_id].data.labels = [];
-                    chart_slot[slot_id].update();
+                if (charts[slot_id].data['datasets'].length > parseInt(item.value) ) {
+                    //chart_slot[slot_id].data.datasets[parseInt(item.value)-1].data = Array();
+                    //chart_slot[slot_id].data.labels = Array();
+                    charts[slot_id].clear()
+                    charts[slot_id].update();
                 }
-
+                var slot_id = parseInt(item.value) - 1;
                 $.ajax({
                     type: "POST",
-                    url: "api/"+func+"/"+item.value,
+                    url: "api/" + func+"/" + (parseInt(item.value) -1),
                     data: serial,
                     success: function(response) {
                         alert_popup('success', response.message);
+                        cell_update_interval(slot_id);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
                     if ( typeof jqXHR.responseJSON == "object" ) {
@@ -296,7 +260,6 @@ $('.btn-submit').on('click', function() {
             var cutoffma = $(this).closest('form').find('[name="cutoffma"]').val();
             var cycles = $(this).closest('form').find('[name="cycles"]').val();
 
-            cell_update_interval();
             if ( $(this).closest('form').find('[name="cell"]:checked').length == 0 ) {
                 alert_popup('danger', "You must select at least 1 Cell");
                 return;
@@ -329,22 +292,24 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "'Cutoff Current' outside of range [50 >= value <= 250]");
                 return;
             }
-            console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
-            $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item){
+
+            $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item) {
 
                 // Clear graphs for cell
-                if (chart_slot[slot_id].data['datasets'].length > parseInt(item.value) ) {
-                    config_chart[slot_id].data.datasets[parseInt(item.value)-1].data = [];
-                    config_chart[slot_id].data.labels = [];
-                    chart_slot[slot_id].update();
+                if (charts[slot_id].data['datasets'].length > parseInt(item.value) ) {
+                    //chart_slot[slot_id].data.datasets[parseInt(item.value)-1].data = Array();
+                    //chart_slot[slot_id].data.labels = Array();
+                    charts[slot_id].clear();
+                    charts[slot_id].update();
                 }
-
+                var slot_id = parseInt(item.value) - 1;
                 $.ajax({
                     type: "POST",
-                    url: "api/"+func+"/"+item.value,
+                    url: "api/" + func+"/" + (parseInt(item.value) -1),
                     data: serial,
                     success: function(response) {
                         alert_popup('success', response.message);
+                        cell_update_interval(slot_id);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
                     if ( typeof jqXHR.responseJSON == "object" ) {
@@ -362,17 +327,19 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "You must select at least 1 Cell");
                 return;
             }
-            console.log(".btn-submit->click["+func+"] POSTING -> "+serial);
+
             $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item){
                 $.ajax({
                     type: "POST",
-                    url: "api/"+func+"/"+item.value,
+                    url: "api/" + func+"/" + (parseInt(item.value) - 1),
                     data: serial,
                     success: function(response) {
-                        alert_popup('success', response.message);
+                        alert_popup('success', response);
+                        stop_cell_interval(intervalHandles[parseInt(item.value) - 1]);
                     }
 
                 }).fail( function(jqXHR, textStatus, errorThrown) {
+                    stop_cell_interval((parseInt(item.value) - 1))
                     if ( typeof jqXHR.responseJSON == "object" ) {
                         alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
                     } else {
@@ -382,7 +349,6 @@ $('.btn-submit').on('click', function() {
             });
             break;
     }
-
 });
 
 function stop_cell_interval(slot_id) {
@@ -392,97 +358,83 @@ function stop_cell_interval(slot_id) {
 
 function cell_update_interval(slot_id){
     if (intervalHandles[slot_id]) {
+        console.log("WARN: slot_id interval is already running!");
+        return;
+    }
+    if (slot_id <0 || slot_id> totalCyclerCapacity ) {
+        console.log("CRIT: slot_id "+slot_id+" is out of bounds!");
         return;
     }
 
-    intervalHandles[slot_id] = setInterval( function(slot_id){
-        $.ajax({
-            type: "POST",
-            url: "api/status/"+slot_id,
-            data: JSON.stringify([{ "name": "action", "value": "status" }]),
-            success: function(slot_data) {
-                var date = new Date();
-                //date.setSeconds(45); // specify value for SECONDS here
-                var timeString = date.toISOString().substr(11, 8);
-                console.log("cell_update_interval:"+timeString)
-                //config_chart.data.labels.push(timeString);
-                hasdata = false;
-                //for (const [slot_id, slot_data] of Object.entries(response)) {
-                //$.each(response.message, function(slot_id, slot_data) {
-                    console.log("cell_update_interval data -> "+JSON.stringify(slot_data));
-                slot_data.forEach(function(data, sid) {
-                    if ( Object.keys(data).length > 0 ) {
-                        hasdata = true;
-                        add_slot_data_to_chart(sid, data);
-                        const dateObject = new Date(slot_data['timestamp']*1000);
-                        config_chart[sid].data.labels.push(dateObject.toLocaleString());
-                    }
-                });
-
-                if  (hasdata == false) {
-                    stop_cell_interval(slot_id)
-                }
-
-            }
-        }).fail( function(jqXHR, textStatus, errorThrown) {
-            if ( typeof jqXHR.responseJSON == "object" ) {
-                alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
-            } else {
-                alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
-            }
-        });
-    }, 1000, slot_id);
+    iSlot_id = slot_id;
+    intervalHandles[slot_id] = setInterval( get_slot_update, 1000, iSlot_id);
 }
 
-function addCellData(k, v) {
-    // cell data
-    $('.voltage .cell'+v['id']+'.text-value').text(v['voltage']);
-    $('.watthours .cell'+v['id']+'.text-value').text(v['watthours']);
-    $('.current .cell'+v['id']+'.text-value').text(v['current']);
-    $('.temp .cell'+v['id']+'.text-value').text(v['temp']);
-    $('.amphours .cell'+v['id']+'.text-value').text(v['amphours']);
-}
-
-function add_slot_data_to_chart(slot_id, data) {
-    // Add data to cell charts
-    addCellData(slot_id, data);
-    // Voltage line
-    chart_slot[slot_id].data['datasets'][0]['data'].push(data['voltage']);
-    chart_slot[slot_id].data['datasets'][1]['data'].push(data['current']);
-    const dateObject = new Date(data['timestamp']*1000);
-
-    chart_slot[slot_id].update();
-}
-
-
-
-/*
-    $("#chartjs-size-monitor").resizable({
-        resize: function (event, ui) {
-            //Update chart size according to its container size.
-            $("#chart-millivolt").CanvasJSChart().render();
-        }
-    });
-*/
-
-//    $('#status').on('click', function() {
-//        cell_update_interval();
-//    });
-
-$('#status_stop').on('click', function() {
-    // stop_cell_interval()
-    var slot_id = 0;
+function get_slot_update(slot_id) {
     $.ajax({
         type: "POST",
-        url: "api/history/"+slot_id,
-        data: '[{"name":"action","value":"history"}]',
+        url: "api/status/"+slot_id,
+        data: JSON.stringify([{ "name": "action", "value": "status" }]),
         success: function(response) {
-//                console.log(response.message);
-            $.each(response.message, function(_, values) {
-                add_slot_data_to_chart(slot_id, values);
+            if (response.data[0].length>0 && slot_id != response.data[0].slot_id ) {
+                console.log("CRITICAL: Interval_slot_id mismatch to response.data['slot_id']");
+            }
+            var date = new Date();
+            var timeString = date.toISOString().substr(11, 8);
+
+            response.data.forEach(function(data, index) {
+                if ( Object.keys(data).length > 0 ) {
+                    add_slot_data_to_chart(data);
+                }
             });
+            if  (response.status == 'State.idle') {
+                stop_cell_interval(slot_id)
+            }
+        }
+    }).fail( function(jqXHR, textStatus, errorThrown) {
+        if ( typeof jqXHR.responseJSON == "object" ) {
+            alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseJSON.message)
+        } else {
+            alert_popup('danger', "Status: "+jqXHR.status+" Error: "+jqXHR.responseText)
         }
     });
-});
+}
 
+function addCellData(slot_id, values) {
+    // cell data
+    $('.voltage .slot'+slot_id+'.text-value').text(values['voltage']);
+    $('.watthours .slot'+slot_id+'.text-value').text(values['watthours']);
+    $('.current .slot'+slot_id+'.text-value').text(values['current']);
+    $('.temp .slot'+slot_id+'.text-value').text(values['temp']);
+    $('.amphours .slot'+slot_id+'.text-value').text(values['amphours']);
+}
 
+function add_slot_data_to_chart(data) {
+    slot_id = data['slot_id'];
+
+    // Add data to cell charts
+    addCellData(slot_id, data);
+
+    charts[slot_id].data.datasets[0].data.push(data['voltage']);
+    charts[slot_id].data.datasets[1].data.push(data['current']);
+    const timestamp = new Date(data['timestamp']*1000)
+    charts[slot_id].data.labels.push(timestamp.toLocaleString());
+
+    charts[slot_id].update();
+}
+
+//$('#status_stop').on('click', function() {
+//    // stop_cell_interval()
+//    var slot_id = 0;
+//    $.ajax({
+//        type: "POST",
+//        url: "api/history/"+slot_id,
+//        data: '[{"name":"action","value":"history"}]',
+//        success: function(response) {
+////                console.log(response.message);
+//            $.each(response.message, function(_, values) {
+//                add_slot_data_to_chart(slot_id, values);
+//            });
+//        }
+//    });
+//});
