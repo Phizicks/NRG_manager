@@ -1,7 +1,16 @@
 import logging
 from typing import List
 
-from modules.states import State
+from modules.states import BattDisconnect, BattDisconnected, Charging, Discharging, Idle, MeasuringIR, MeasuringIR10Sec, \
+    NotSet, State
+
+cRed = "\033[31m"
+cGreen = "\033[32m"
+cYellow = "\033[33m"
+cBlue = "\033[34m"
+cMag = "\033[35m"
+cCyan = "\033[36m"
+cNorm = "\033[0m"
 
 
 class CellData:
@@ -16,16 +25,42 @@ class CellData:
         :param values:
         """
         self.log = logging.getLogger(__name__)
-        self.check_parameters(values)
 
+        self.check_parameters(values)
         self._slot_id = values['slot_id']
-        self._stage_id = values['stage_id']
         self._timestamp = values['timestamp']
         self._voltage = values['voltage']
         self._current = values['current']
         self._amphour = values['amphour']
         self._watthour = values['watthour']
         self._temp = values['temp']
+        self._stage_id = NotSet
+
+        # Check if end of a cycle
+        if values['stage_id'] == 1:
+            self._stage_id = Discharging
+            return
+        if values['stage_id'] == 2:
+            self._stage_id = BattDisconnected
+            return
+        if values['stage_id'] == 3:
+            self._stage_id = Charging
+            return
+        if values['stage_id'] == 4:
+            self._stage_id = BattDisconnect
+            return
+        if values['stage_id'] == 6:
+            self._stage_id = MeasuringIR
+            return
+        if values['stage_id'] == 7:
+            self._stage_id = MeasuringIR10Sec
+            return
+        if values['stage_id'] == 8:
+            self._stage_id = Idle
+            self.log.info("{}Slot# {} is now IDLE{}".format(cGreen, self._slot_id, cNorm))
+            return
+
+        raise ValueError("stage_id not set")
 
     @property
     def slot_id(self):
@@ -57,9 +92,13 @@ class CellData:
 
         :return:
         """
+        # try:
+        self.log.critical("to_json->{}".format(type(self._stage_id)))
         return {
-            i: getattr(self, "_" + i) for i in self.valid_keys
+            i: getattr(self, "_" + i) if 'stage_id' != i else self._stage_id.__name__ for i in self.valid_keys
         }
+        # except Exception as e:
+        #     self.log.critical("OOOF: {} {}".format(self._stage_id, e))
 
 
 class Cell:
@@ -71,8 +110,7 @@ class Cell:
         self.log = logging.getLogger(__name__)
 
         self._id = _id
-        self._state = State.idle
-        self._stage = State.idle
+        self._state = Idle
         self._model = None
         self._manufacturer = None
         self._cycle_count = 0
@@ -90,7 +128,7 @@ class Cell:
         self._model = model
         self._manufacturer = manufacturer
 
-    def add_history(self, cell_data) -> None:
+    def add_history(self, cell_data: CellData) -> None:
         """
 
         :param cell_data:
@@ -103,14 +141,14 @@ class Cell:
 
         :return: list of cell history
         """
-        return list(stat for stat in self._history)
+        return list(celldata for celldata in self._history)
 
     def get_last_history(self) -> CellData:
         """
         Returns the latest cell data or an empty dict()
         :return: dic
         """
-        return self.get_history()[-1] if len(self.get_history()) else list()
+        return self.get_history()[-1] if len(self.get_history()) else CellData(dict())
 
     def clear_history(self) -> None:
         """
@@ -125,6 +163,7 @@ class Cell:
 
         :return:
         """
+        self.log.critical("CellSTATUS: {}".format(self._state))
         return self._state
 
     @state.setter
@@ -134,18 +173,9 @@ class Cell:
         :param set_state:
         :return:
         """
+        if not issubclass(set_state, State):
+            raise Exception("Not of type 'State'")
         self._state = set_state
-        # if set_state == State.idle:
-        #     self._cycle_count = 0
-        #     self._cycle_total = 0
-        #     self.state_now = -1
-        #     self.full_list = []
-        #     self.pending = 0
-        #     self._voltage = None
-        #     self._amphours = None
-        #     self._watthours = None
-        #     self._current = None
-        #     self._temp = None
 
     def cell_status_since(self, timestamp):
         selected = filter(lambda x: x.timestamp > timestamp, self.get_history()[::-1])
@@ -155,6 +185,7 @@ class Cell:
         }
         logging.critical(("SINCE: {}".format(selected)))
         return output
+
 
 if __name__ == "__main__":
     c = Cell(0)

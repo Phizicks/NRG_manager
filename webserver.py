@@ -50,6 +50,7 @@ def wait_and_get_response(rid):
     response = webqueue[rid].get()
     webqueue[rid].task_done()
     del webqueue[rid]
+    logging.critical("SendingResponse: {}".format(response))
     return Response(response['message'], status=response['code'], mimetype=response['mimetype'])
 
 

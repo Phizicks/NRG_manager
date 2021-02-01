@@ -1,46 +1,68 @@
-from enum import Enum
+class State:
+    pass
 
 
-class State(Enum):
-    class Discharge:
-        def value(self):
-            return 1
-
-    class Charge:
-        def value(self):
-            return 2
-
-    class Waiting:
-        def value(self):
-            return 3
-
-    class ChargeEnd:
-        def value(self):
-            return 4
-
-    class IRcheck:
-        def value(self):
-            return 5
-
-    class Idle:
-        def value(self):
-            return 6
-
-    discharging = 1
-    charging = 2
-    waiting = 3
-    charged_end = 4
-    ir_check = 5
-    idle = 6
-
-# 0. Cell 1 periodic status
-# 1. Cell 1 end of discharge stats
-# 2. Cell 1 end of charge stats
-# 3. Cell 1 IR debug
-# 4. Buffer pack voltage/system status
-# 5. Cell 2 periodic status
-# 6. Cell 2 end of discharge stats
-# 7. Cell 2 end of charge stats
-# 8. Cell 2 IR debug
+class Discharging(State):
+    def __eq__(self, value):
+        return True if value == 1 else False
 
 
+class BattDisconnected(State):
+    def __eq__(self, value):
+        return True if value == 2 else False
+
+
+class Charging(State):
+    def __eq__(self, value):
+        return True if value == 3 else False
+
+
+class BattDisconnect(State):
+    def __eq__(self, value):
+        return True if value == 4 else False
+
+
+class Waiting(State):
+    def __eq__(self, value):
+        return True if value == 5 else False
+
+
+class MeasuringIR(State):
+    def __eq__(self, value):
+        return True if value == 6 else False
+
+
+class MeasuringIR10Sec(State):
+    def __eq__(self, value):
+        return True if value == 7 else False
+
+
+class Idle(State):
+    def __eq__(self, value):
+        return True if value == 8 else False
+
+
+class NotSet(State):
+    def __eq__(self, value):
+        return True if value == 0 else False
+
+
+def get_state(state_id):
+    if state_id == 0:
+        return NotSet
+    if state_id == 1:
+        return Discharging
+    if state_id == 2:
+        return BattDisconnected
+    if state_id == 3:
+        return Charging
+    if state_id == 4:
+        return BattDisconnect
+    if state_id == 5:
+        return Waiting
+    if state_id == 6:
+        return MeasuringIR
+    if state_id == 7:
+        return MeasuringIR10Sec
+    if state_id == 8:
+        return Idle

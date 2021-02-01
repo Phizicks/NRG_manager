@@ -362,7 +362,29 @@
           <div class="animated fadeIn">
             <!-- /.card-->
             <div class="row">
-              <div class="col-sm-6 col-lg-3 voltage">
+              <!-- /.col-->
+              <div class="col-sm-6 col-lg-2 stage_id">
+                <div class="brand-card">
+                  <div class="brand-card-header bg-flickr">
+                    <i class="fa fa-linkedin"></i>
+                    <div class="chart-wrapper">
+                      <canvas id="mini-stage_id" height="90"></canvas>
+                    </div>
+                  </div>
+                  <div class="brand-card-body">
+                    <div>
+                      <div class="slot0 text-value">#</div>
+                      <div class="slot0 text-muted small">Slot 0 State</div>
+                    </div>
+                    <div>
+                      <div class="slot1 text-value">#</div>
+                      <div class="slot1 text-muted small">Slot 1 State</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- /.col-->
+              <div class="col-sm-6 col-lg-2 voltage">
                 <div class="brand-card">
                   <div class="brand-card-header bg-facebook">
                     <i class="fa fa-facebook"></i>
@@ -373,17 +395,17 @@
                   <div class="brand-card-body">
                     <div>
                       <div class="slot0 text-value">#</div>
-                      <div class="slot0 text-muted small">Slot 1 mV</div>
+                      <div class="slot0 text-muted small">Slot 0 mV</div>
                     </div>
                     <div>
                       <div class="slot1 text-value">#</div>
-                      <div class="slot1 text-muted small">Slot 2 mV</div>
+                      <div class="slot1 text-muted small">Slot 1 mV</div>
                     </div>
                   </div>
                 </div>
               </div>
               <!-- /.col-->
-              <div class="col-sm-6 col-lg-3 current">
+              <div class="col-sm-6 col-lg-2 current">
                 <div class="brand-card">
                   <div class="brand-card-header bg-twitter">
                     <i class="fa fa-twitter"></i>
@@ -394,53 +416,74 @@
                   <div class="brand-card-body">
                     <div>
                       <div class="slot0 text-value">#</div>
-                      <div class="slot0 text-muted small">Slot 1 mA</div>
+                      <div class="slot0 text-muted small">Slot 0 mA</div>
                     </div>
                     <div>
                       <div class="slot1 text-value">#</div>
-                      <div class="slot1 text-muted small">Slot 2 mA</div>
+                      <div class="slot1 text-muted small">Slot 1 mA</div>
                     </div>
                   </div>
                 </div>
               </div>
               <!-- /.col-->
-              <div class="col-sm-6 col-lg-3 watthours">
+              <div class="col-sm-6 col-lg-2 amphours">
                 <div class="brand-card">
                   <div class="brand-card-header bg-linkedin">
                     <i class="fa fa-linkedin"></i>
                     <div class="chart-wrapper">
-                      <canvas id="mini-milliamphour" height="90"></canvas>
+                      <canvas id="mini-amphour" height="90"></canvas>
                     </div>
                   </div>
                   <div class="brand-card-body">
                     <div>
                       <div class="slot0 text-value">#</div>
-                      <div class="slot0 text-muted small">Slot 1 mAh</div>
+                      <div class="slot0 text-muted small">Slot 0 mAh</div>
                     </div>
                     <div>
                       <div class="slot1 text-value">#</div>
-                      <div class="slot1 text-muted small">Slot 2 mAh</div>
+                      <div class="slot1 text-muted small">Slot 1 mAh</div>
                     </div>
                   </div>
                 </div>
               </div>
               <!-- /.col-->
-              <div class="col-sm-6 col-lg-3 amphours">
+              <div class="col-sm-6 col-lg-2 watthours">
                 <div class="brand-card">
                   <div class="brand-card-header bg-google-plus">
                     <i class="fa fa-google-plus"></i>
                     <div class="chart-wrapper">
-                      <canvas id="mini-milliwatt" height="90"></canvas>
+                      <canvas id="mini-watthours" height="90"></canvas>
                     </div>
                   </div>
                   <div class="brand-card-body">
                     <div>
                       <div class="slot0 text-value">#</div>
-                      <div class="slot0 text-muted small">Cell 1 WH</div>
+                      <div class="slot0 text-muted small">Slot 0 WH</div>
                     </div>
                     <div>
                       <div class="slot1 text-value">#</div>
-                      <div class="slot1 text-muted small">Cell 2 WH</div>
+                      <div class="slot1 text-muted small">Slot 1WH</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- /.col-->
+              <div class="col-sm-6 col-lg-2 temp">
+                <div class="brand-card">
+                  <div class="brand-card-header bg-google-plus">
+                    <i class="fa fa-google-plus"></i>
+                    <div class="chart-wrapper">
+                      <canvas id="mini-temp" height="90"></canvas>
+                    </div>
+                  </div>
+                  <div class="brand-card-body">
+                    <div>
+                      <div class="slot0 text-value">#</div>
+                      <div class="slot0 text-muted small">Slot 0 degC</div>
+                    </div>
+                    <div>
+                      <div class="slot1 text-value">#</div>
+                      <div class="slot1 text-muted small">Slot 1 degC</div>
                     </div>
                   </div>
                 </div>
@@ -462,9 +505,9 @@
                         <a class="dropdown-item" href="#">Something else here</a>
                       </div>
                     </div>
-                    <div>Cell 1 Voltage</div>
+                    <div>Slot 0 Voltage</div>
                     <div class="text-value">4200 mV</div>
-                    <div>Cell 2 Voltage</div>
+                    <div>Slot 1 Voltage</div>
                     <div class="text-value">4200 mV</div>
                   </div>
                 </div>
@@ -475,9 +518,9 @@
                     <button class="btn btn-transparent p-0 float-right" type="button">
                       <i class="icon-location-pin"></i>
                     </button>
-                    <div>Cell 1 Current</div>
+                    <div>Slot 0 Current</div>
                     <div class="text-value">1000 mAh</div>
-                    <div>Cell 2 Current</div>
+                    <div>Slot 1 Current</div>
                     <div class="text-value">1000 mAh</div>
                   </div>
                 </div>
@@ -495,9 +538,9 @@
                         <a class="dropdown-item" href="#">Something else here</a>
                       </div>
                     </div>
-                    <div>Cell 1 Watt Hours</div>
+                    <div>Slot 0 Watt Hours</div>
                     <div class="text-value">9823 mWh</div>
-                    <div>Cell 2 Watt Hours</div>
+                    <div>Slot 1 Watt Hours</div>
                     <div class="text-value">9823 mWh</div>
                   </div>
                 </div>
@@ -515,9 +558,9 @@
                         <a class="dropdown-item" href="#">Something else here</a>
                       </div>
                     </div>
-                    <div>Cell 1 IR</div>
+                    <div>Slot 0 IR</div>
                     <div class="text-value">59.823</div>
-                    <div>Cell 2 IR</div>
+                    <div>Slot 1 IR</div>
                     <div class="text-value">59.823</div>
                   </div>
                 </div>

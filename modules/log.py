@@ -1,6 +1,6 @@
 import logging
 
-logging.getLogger('connectionpool').setLevel(logging.CRITICAL)
+logging.getLogger('connectionpool').setLevel(logging.DEBUG)
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)

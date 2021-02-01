@@ -7,7 +7,7 @@ import threading
 import time
 
 from classes.cell import Cell, CellData
-from modules.states import State
+from modules.states import *  # State, Idle, Charging, Discharging
 from modules.usbserial import USBSerial
 
 # from modules.http import Http
@@ -39,13 +39,13 @@ class Slot:
         """
         self.log = logging.getLogger(__name__)
         self._slot_id = slot_id
-        self._state = State.idle
+        self._state = Idle
         self._profile = None
         self._cell = Cell()
         self._history = []
 
         self._cycle_count = 0
-        self._stage = State.idle
+        self._stage = Idle
 
     @property
     def status(self) -> dict:
@@ -54,7 +54,7 @@ class Slot:
         :return:
         """
         return {
-            "state": self._state,
+            "state": str(self._state)
         }
 
     @property
@@ -81,8 +81,8 @@ class Slot:
         """
         if self.has_cell:
             raise Exception("No cell set")
-        if self.cell.state == State.idle:
-            return []
+        if self.cell.state == Idle:
+            return CellData()
 
         return self.cell.get_last_history()
 
@@ -108,15 +108,15 @@ class Slot:
         return time.time() - self._start_time
 
     def set_state(self, state):
-        if not isinstance(state, State):
+        if not issubclass(state, State):
             raise ValueError("Expected type of '{}' but received '{}'".format(type(State), type(state)))
 
         self._state = state
 
-        if state == State.discharging:
+        if state == Discharging:
             self._cycle_count = 0
             self._cycle_total = 0
-            self._stage = 'idle'
+            self._stage = Idle
             self.state_now = -1
             self.full_list = []
             self.pending = 0
@@ -128,9 +128,9 @@ class Slot:
 
     # @state.setter
     def state(self, value):
-        if value not in ['idle', 'charging', 'discharging', 'cycle', 'power']:
-            raise ValueError("'{}' not a value state".format(value))
-        if self._state != 'idle' and value != 'idle':
+        if issubclass(value, State):
+            raise ValueError("'{}' not a value State".format(value))
+        if self._state != Idle and value != Idle:
             raise ValueError("Cannot set new state of non idle cell")
         self._state = value
 
@@ -138,23 +138,23 @@ class Slot:
         if self._cycle_total == 0:
             if self.state_now == 2:
                 self.log.info("Cell1 charging cycle completed")
-                self.set_state('idle')
+                self.set_state(Idle)
                 return
             if self.state_now == 7:
                 self.log.info("Cell2 charging cycle completed")
-                self.set_state('idle')
+                self.set_state(Idle)
                 return
             if self.state_now == 1:
                 self.log.info("Cell1 discharging cycle completed")
-                self.set_state('idle')
+                self.set_state(Idle)
                 return
             if self.state_now == 6:
                 self.log.info("Cell2 discharging cycle completed")
-                self.set_state('idle')
+                self.set_state(Idle)
                 return
         elif self._cycle_total > self._cycle_count:
             if self.state_now == 1:
-                self.stage = "idle"
+                self.stage = Idle
                 self.log.info("Full cycle completed")
                 return
             elif self.state_now == 2:
@@ -164,30 +164,17 @@ class Slot:
         else:
             if self.state_now == 2:
                 self.log.info("Cell1 cycle test completed")
-                self.set_state('idle')
+                self.set_state(Idle)
             if self.state_now == 1:
-                self.stage = "idle"
+                self.stage = Idle
                 self.log.info("Full cycle completed")
 
     @property
     def get_history(self):
         return self._history
 
-    def add_history(self, values):
-        self._history.append(values)
-
-    # def update(self, payload):
-    #     """
-    #
-    #     :param payload:
-    #     :return:
-    #     """
-    #     self._stage = payload['tags']['stage']
-    #     self._voltage = payload['fields']['voltage']
-    #     self._amphours = payload['fields']['amphour']
-    #     self._watthours = payload['fields']['watthour']
-    #     self._current = payload['fields']['current']
-    #     self._temp = payload['fields']['temp']
+    def add_history(self, cell_data: CellData):
+        self._history.append(cell_data)
 
 
 class Cycler(threading.Thread):
@@ -204,23 +191,6 @@ class Cycler(threading.Thread):
 
         self.log = logging.getLogger(__name__)
 
-        self.states = {'1': 'Battery Disconnected ',
-                       '2': 'Battery Discharge',
-                       '3': 'Battery Charge',
-                       '4': 'Battery Disconnect',
-                       '5': 'Waiting 1 minute',
-                       '6': 'Measuring IR',
-                       '7': 'Measuring IR',
-                       '8': 'Parking'
-                       }
-        self.states = {'1': 'Battery discharging ',
-                       '2': 'Battery charging',
-                       '3': 'End of discharge',
-                       '4': 'End of charge',
-                       '5': 'IR measuring',
-                       '6': 'Idle'
-                       }
-
         # Initialize slots
         self.slots = []
         for id in range(1, self.total_slots + 1):
@@ -229,7 +199,7 @@ class Cycler(threading.Thread):
         self.log.debug("{}Number of cyclers configured: {}{}".format(cCyan, self.total_slots, cNorm))
 
     def comm_init(self):
-        while True:
+        if not self.device or not self.device.is_connected:
             # Connect
             # ________
             self.device = USBSerial('/dev/ttyACM0')
@@ -243,9 +213,8 @@ class Cycler(threading.Thread):
                 time.sleep(5)
             else:
                 self.log.info("Connected to serial")
-                break
 
-        while True:
+        if not self.device.is_sync:
             # Initialize
             # ___________
             try:
@@ -257,7 +226,6 @@ class Cycler(threading.Thread):
                 self.log.error("Arduino sync failure: {}".format(e))
             else:
                 self.log.info("Synced with arduino")
-                break
 
     def connect(self):
         self.stage = 'connecting'
@@ -287,7 +255,7 @@ class Cycler(threading.Thread):
         data = self.device.readlines()
         for line in data:
             self.log.debug("Received: {}{}{}".format(cBlue, line, cNorm))
-
+            # self.sync()
         self.log.debug("Sending ? to get menu")
         self.device.sendline("?\n")
         time.sleep(0.1)
@@ -301,6 +269,8 @@ class Cycler(threading.Thread):
                 # NEW if '> Select Mode:'  in line:
                 self.stage = 'initialized'
                 self.log.info(cGreen + 'Initialized' + cNorm)
+                # Define the device as in sync
+                self.device.is_sync = True
                 return True
 
         return False
@@ -309,14 +279,15 @@ class Cycler(threading.Thread):
         return [c.to_json for c in self.slots[slot_id].get_history()]
 
     def get_slots_status(self, slot_id):
+        self.log.critical("DEBUGSTATUS {}".format(self.slots[slot_id].state))
         return json.dumps({
-            "status": str(self.slots[slot_id].state),
+            "status": self.slots[slot_id].state.__name__,
             "data": [
                 self.slots[slot_id].get_history()[-1].to_json
-                if len(self.slots[slot_id].get_history()) > 0 and self.slots[slot_id].state != State.idle else []
+                if len(self.slots[slot_id].get_history()) > 0  else []
             ]})
 
-    def charge_slot(self, request_id:str, slot_id:int, data:dict):
+    def charge_slot(self, request_id: str, slot_id: int, data: dict):
         settings = ""
         settings += "" if 'current' not in data['payload'] or data['payload']['current'] == "" else "i{} ".format(
                 data['payload']['current'])
@@ -326,10 +297,11 @@ class Cycler(threading.Thread):
                 data['payload']['cutoffma'])
 
         # Detect cells state
-        if self.slots[slot_id].state != State.idle:
+        if self.slots[slot_id].state != Idle:
             return self.respond(request_id, "Slot {} is not idle".format(slot_id), 400)
         else:
-            self.slots[slot_id].state = State.charging
+            self.slots[slot_id].state = Charging
+            self.log.critical(self.slots[slot_id].state)
             self.log.info(
                     "{}Started charge on Slot {} with settings: {}{}".format(cGreen, slot_id,
                                                                              settings if settings else "default",
@@ -381,8 +353,8 @@ class Cycler(threading.Thread):
         # _______________
         match = re.search(r'> Cell (\d+) OVT, stopping', line)
         if match:
-            slot_id = int(match.group(1))  # TODO zero base slots
-            self.slots[slot_id].state = State.idle
+            slot_id = int(match.group(1)) - 1  # TODO zero base slots
+            self.slots[slot_id].state = Idle
             self.log.info("{}Slot{} is now IDLE{}".format(cGreen, slot_id, cNorm))
             return
 
@@ -394,8 +366,11 @@ class Cycler(threading.Thread):
 
         # Determine slot id
         try:
+            self.log.debug("{}Received: {}{}".format(cCyan, value_list, cNorm))
+
             # State = completed charge, exit out
             msg_type = int(value_list[0])
+
             # Set the slot_id
             if msg_type in {0, 1, 2, 3}:
                 slot_id = 0
@@ -404,23 +379,24 @@ class Cycler(threading.Thread):
             else:
                 # Skip non cell# info (4 is debug)
                 return
-            self.log.debug("{}Received: {}{}".format(cCyan, value_list, cNorm))
+
+            state_type = int(value_list[-1])
 
             # Check if end of a cycle
-            if msg_type in [1, 2, 6, 7]:
+
+            self.slots[slot_id].state = get_state(state_type)
+            if state_type == Idle:
                 self.log.info("{}Slot# {} is now IDLE{}".format(cGreen, slot_id, cNorm))
-                self.slots[slot_id].state = State.idle
-                return
 
             # Store data in slot data
             try:
                 formatted = self.format_data(slot_id, value_list)
             except:
                 self.log.critical("BAD format: {}::{}".format(slot_id, value_list))
+                return
 
-            cell_data = CellData(formatted)
             # slot_id = cell_data.slot_id
-            self.slots[slot_id].add_history(cell_data)
+            self.slots[slot_id].add_history(CellData(formatted))
 
             return
 
@@ -452,7 +428,11 @@ class Cycler(threading.Thread):
         try:
             # While comms is enabled
             while not self.comsevent.is_set():
-                if self.device is None:
+                try:
+                    if self.device is None or not self.device.is_connected or not self.device.is_sync:
+                        self.log.error("{}Re-initializing lost comms{}".format(cRed, cNorm))
+                        self.comm_init()
+                except:
                     self.log.error("{}Re-initializing lost comms{}".format(cRed, cNorm))
                     self.comm_init()
 
@@ -470,6 +450,14 @@ class Cycler(threading.Thread):
 
                     self.log.debug(
                             "{}Id: {} Request: {}{}".format(cMag, request_id, request, cNorm))
+
+                    if self.device is None or not self.device.is_connected or not self.device.is_sync:
+                        self.webqueue[request_id].put({
+                            "message": "Comm port failure, attempting to reconnect and sync",
+                            "code": 500,
+                            "mimetype": "application/json"
+                        })
+                        continue
 
                     # /api/history/#
                     if action == 'history':
@@ -616,12 +604,12 @@ class Cycler(threading.Thread):
         :param slot_id:
         :return:
         """
-        if self.slots[slot_id].state == State.idle:
+        if self.slots[slot_id].state == Idle:
             return self.respond(request_id, "Cell {} is already idle".format(slot_id), 400)
         else:
             self.device.sendline("n{}\n".format(slot_id + 1))
             self.log.info("Stopping Slot {} currently:{}".format(slot_id, self.slots[slot_id].state))
-            self.slots[slot_id].state = State.idle
+            self.slots[slot_id].state = Idle
             return self.respond(request_id, "Stopping Slot {}".format(slot_id), 200)
 
     def api_status(self, request_id, slot_id, params):

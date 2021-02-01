@@ -376,7 +376,8 @@ function get_slot_update(slot_id) {
         url: "api/status/"+slot_id,
         data: JSON.stringify([{ "name": "action", "value": "status" }]),
         success: function(response) {
-            if (response.data[0].length>0 && slot_id != response.data[0].slot_id ) {
+        console.log(response.data);
+            if (response.data.length>0 && slot_id != response.data[0].slot_id ) {
                 console.log("CRITICAL: Interval_slot_id mismatch to response.data['slot_id']");
             }
             var date = new Date();
@@ -387,7 +388,8 @@ function get_slot_update(slot_id) {
                     add_slot_data_to_chart(data);
                 }
             });
-            if  (response.status == 'State.idle') {
+
+            if  (response.status == 'Idle') {
                 stop_cell_interval(slot_id)
             }
         }
@@ -403,10 +405,11 @@ function get_slot_update(slot_id) {
 function addCellData(slot_id, values) {
     // cell data
     $('.voltage .slot'+slot_id+'.text-value').text(values['voltage']);
-    $('.watthours .slot'+slot_id+'.text-value').text(values['watthours']);
+    $('.watthours .slot'+slot_id+'.text-value').text(values['watthour']);
     $('.current .slot'+slot_id+'.text-value').text(values['current']);
     $('.temp .slot'+slot_id+'.text-value').text(values['temp']);
-    $('.amphours .slot'+slot_id+'.text-value').text(values['amphours']);
+    $('.amphours .slot'+slot_id+'.text-value').text(values['amphour']);
+    $('.stage_id .slot'+slot_id+'.text-value').text(values['stage_id']);
 }
 
 function add_slot_data_to_chart(data) {
