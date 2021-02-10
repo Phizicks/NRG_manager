@@ -82,7 +82,7 @@ class Slot:
         if self.has_cell:
             raise Exception("No cell set")
         if self.cell.state == Idle:
-            return CellData()
+            return CellData(dict())
 
         return self.cell.get_last_history()
 
@@ -279,15 +279,14 @@ class Cycler(threading.Thread):
         return [c.to_json for c in self.slots[slot_id].get_history()]
 
     def get_slots_status(self, slot_id):
-        self.log.critical("DEBUGSTATUS {}".format(self.slots[slot_id].state))
         return json.dumps({
             "status": self.slots[slot_id].state.__name__,
             "data": [
                 self.slots[slot_id].get_history()[-1].to_json
-                if len(self.slots[slot_id].get_history()) > 0  else []
+                if len(self.slots[slot_id].get_history()) > 0 else []
             ]})
 
-    def charge_slot(self, request_id: str, slot_id: int, data: dict):
+    def api_charge_slot(self, request_id: str, slot_id: int, data: dict):
         settings = ""
         settings += "" if 'current' not in data['payload'] or data['payload']['current'] == "" else "i{} ".format(
                 data['payload']['current'])
@@ -301,7 +300,6 @@ class Cycler(threading.Thread):
             return self.respond(request_id, "Slot {} is not idle".format(slot_id), 400)
         else:
             self.slots[slot_id].state = Charging
-            self.log.critical(self.slots[slot_id].state)
             self.log.info(
                     "{}Started charge on Slot {} with settings: {}{}".format(cGreen, slot_id,
                                                                              settings if settings else "default",
@@ -333,6 +331,7 @@ class Cycler(threading.Thread):
         formatted = {
             "slot_id": int(slot_id),
             "stage_id": int(data[6][0]),
+            "stage": get_state(int(data[6][0])),
             "voltage": float(data[1]),
             "current": float(data[2]),
             "amphour": float(data[3]),
@@ -428,6 +427,8 @@ class Cycler(threading.Thread):
         try:
             # While comms is enabled
             while not self.comsevent.is_set():
+                # self.log.error("{}comms interrup set: {}{}".format(cRed, self.comsevent.is_set(), cNorm))
+
                 try:
                     if self.device is None or not self.device.is_connected or not self.device.is_sync:
                         self.log.error("{}Re-initializing lost comms{}".format(cRed, cNorm))
@@ -493,8 +494,30 @@ class Cycler(threading.Thread):
                                 "mimetype": "application/json"
                             })
                         else:
-                            self.slots[slot_id].clear_history()
-                            self.charge_slot(request_id, slot_id, request)
+                            # self.slots[slot_id].clear_history()
+                            self.api_charge_slot(request_id, slot_id, request)
+                            # /api/charge/#
+                    elif action == "cycle":
+                        if not self.is_valid_slot(slot_id):
+                            self.webqueue[request_id].put({
+                                "message": "Invalid slot_id",
+                                "code": 400,
+                                "mimetype": "application/json"
+                            })
+                        else:
+                            # self.slots[slot_id].clear_history()
+                            self.api_cycle_slot(request_id, slot_id, request)
+                    # /api/charge/#
+                    elif action == "discharge":
+                        if not self.is_valid_slot(slot_id):
+                            self.webqueue[request_id].put({
+                                "message": "Invalid slot_id",
+                                "code": 400,
+                                "mimetype": "application/json"
+                            })
+                        else:
+                            # self.slots[slot_id].clear_history()
+                            self.api_discharge(request_id, slot_id, request)
                     else:
                         self.webqueue[request_id].put(
                                 {
@@ -511,92 +534,71 @@ class Cycler(threading.Thread):
                         self.process_cycle_data(line)
 
                 time.sleep(0.1)
-
+            self.log.critical("Cycler breaking out")
+            sys.exit()
         except KeyboardInterrupt:
             self.log.warning("{}Cycler thread cancelled{}".format(cYellow, cNorm))
             raise KeyboardInterrupt
 
-    # def api_charge(self, request_id, slot_id, data):
-    #     """
-    #
-    #     :param slot_id:
-    #     :param data:
-    #     :return:
-    #     """
-    #     self.slots[slot_id].clear_history()
-    #     settings = ""
-    #     settings += "" if 'current' not in data or data['current'] == "" else "i{} ".format(data['current'])
-    #     settings += "" if 'voltage' not in data or data['voltage'] == "" else "v{} ".format(data['voltage'])
-    #     settings += "" if 'cutoffma' not in data or data['cutoffma'] == "" else "o{} ".format(data['cutoffma'])
-    #
-    #     # Detect cells state
-    #     if self.slots[slot_id].state != 'idle':
-    #         return self.respond(request_id, "Cell {} not idle".format(slot_id + 1), 400)
-    #     else:
-    #         self.slots[slot_id].state = 'charging'
-    #         self.log.info("Started charging on Slot {} with settings: {}".format(slot_id + 1, settings))
-    #
-    #         self.device.sendline("n{}\n".format(slot_id + 1))
-    #         time.sleep(0.1)
-    #         self.device.sendline("c{} {}\n".format(slot_id + 1, settings))
-    #
-    #         return self.respond(request_id, "Started charging on Slot {} with settings: {}".format(slot_id + 1, settings), 200)
+    def api_discharge(self, request_id: str, slot_id: int, data: dict):
+        """
 
-    # def api_discharge(self, cellid, data):
-    #     """
-    #
-    #     :param cellid:
-    #     :param data:
-    #     :return:
-    #     """
-    #     self.slots[cellid].clear_history()
-    #     settings = ""
-    #     settings += "" if 'discma' not in data or data['discma'] == "" else "i{} ".format(data['discma'])
-    #     settings += "" if 'cutoffmv' not in data or data['cutoffmv'] == "" else "v{} ".format(data['cutoffmv'])
-    #     settings += "" if 'mode' not in data or data['mode'] == "" else "m{} ".format(data['mode'])
-    #
-    #     # Detect cells state
-    #     if self.slots[cellid].state != 'idle':
-    #         return self.respond("Slot {} not idle".format(cellid + 1), 400)
-    #     else:
-    #         self.slots[cellid].state = 'discharging'
-    #         self.log.info("Started discharge on Cell {} settings:{}".format(cellid + 1, settings))
-    #
-    #         self.device.sendline("n{}\n".format(cellid + 1))
-    #         time.sleep(0.1)
-    #         self.device.sendline("d{} {}\n".format(cellid + 1, settings))
-    #
-    #         return self.respond("Started discharge on Slot {} with settings: {}".format(cellid + 1, settings), 200)
+        :param cellid:
+        :param data:
+        :return:
+        """
+        self.slots[slot_id].clear_history()
+        settings = ""
+        settings += "" if 'discma' not in data['payload'] or data['payload']['discma'] == "" else "i{} ".format(
+                data['payload']['discma'])
+        settings += "" if 'cutoffmv' not in data['payload'] or data['payload']['cutoffmv'] == "" else "v{} ".format(
+                data['payload']['cutoffmv'])
+        settings += "" if 'mode' not in data['payload'] or data['payload']['mode'] == "" else "m{} ".format(
+                data['payload']['mode'])
 
-    # def api_cycle(self, request_id, slot_id, data):
-    #     """
-    #
-    #     :param slot_id:
-    #     :param data:
-    #     :return:
-    #     """
-    #     self.slots[slot_id].clear_history()
-    #     settings = ""
-    #     settings += "" if 'discma' not in data or data['discma'] == "" else "y{} ".format(data['discma'])
-    #     settings += "" if 'cutoffmv' not in data or data['cutoffmv'] == "" else "v{} ".format(data['cutoffmv'])
-    #     settings += "" if 'mode' not in data or data['mode'] == "" else "m{} ".format(data['mode'])
-    #     settings += "" if 'chrma' not in data or data['chrma'] == "" else "k{} ".format(data['chrma'])
-    #     settings += "" if 'chrmv' not in data or data['chrmv'] == "" else "u{} ".format(data['chrmv'])
-    #     settings += "" if 'cutoffma' not in data or data['cutoffma'] == "" else "o{} ".format(data['cutoffma'])
-    #     settings += "" if 'cycles' not in data or data['cycles'] == "" else "l{} ".format(data['cycles'])
-    #
-    #     # Detect cells state
-    #     if self.slots[slot_id].state != 'idle':
-    #         return self.respond(request_id, "Cell {} not idle".format(slot_id + 1), 400)
-    #     else:
-    #         self.slots[slot_id].state = 'cycle'
-    #         self.slots[slot_id].cycle_total = int(data['cycles'] if data['cycles'] != "" else 1)
-    #         self.log.info("Cycle start on Slot {} settings: {}".format(slot_id + 1, settings))
-    #         self.device.sendline("n{}\n".format(slot_id + 1))
-    #         time.sleep(0.1)
-    #         self.device.sendline("y{} {}\n".format(slot_id + 1, settings))
-    #
-    #         return self.respond(request_id, "Cycle started on Slot {}".format(slot_id + 1), 200)
+        # Detect cells state
+        if self.slots[slot_id].state != Idle:
+            return self.respond(request_id, "Slot {} not idle".format(slot_id), 400)
+        else:
+            self.device.sendline("n{}\n".format(slot_id + 1))
+            self.log.info("Started discharge on Cell {} settings:{}".format(slot_id + 1, settings))
+            time.sleep(0.1)
+            self.device.sendline("d{} {}\n".format(slot_id + 1, settings))
+            self.slots[slot_id].state = Discharging
+
+            return self.respond(request_id,
+                                "Started discharge on Slot {} with settings: {}".format(slot_id, settings),
+                                200)
+
+    def api_cycle_slot(self, request_id, slot_id, data):
+        """
+
+        :param slot_id:
+        :param data:
+        :return:
+        """
+        self.slots[slot_id].clear_history()
+        settings = ""
+        settings += "" if 'discma' not in data['payload'] or data['payload']['discma'] == "" else "y{} ".format(data['payload']['discma'])
+        settings += "" if 'cutoffmv' not in data['payload'] or data['payload']['cutoffmv'] == "" else "v{} ".format(data['payload']['cutoffmv'])
+        settings += "" if 'mode' not in data['payload'] or data['payload']['mode'] == "" else "m{} ".format(data['payload']['mode'])
+        settings += "" if 'chrma' not in data['payload'] or data['payload']['chrma'] == "" else "k{} ".format(data['payload']['chrma'])
+        settings += "" if 'chrmv' not in data['payload'] or data['payload']['chrmv'] == "" else "u{} ".format(data['payload']['chrmv'])
+        settings += "" if 'cutoffma' not in data['payload'] or data['payload']['cutoffma'] == "" else "o{} ".format(data['payload']['cutoffma'])
+        settings += "" if 'cycles' not in data['payload'] or data['payload']['cycles'] == "" else "l{} ".format(data['payload']['cycles'])
+
+        # Detect cells state
+        if self.slots[slot_id].state != Idle:
+            return self.respond(request_id, "Cell {} not idle".format(slot_id + 1), 400)
+        else:
+            # self.slots[slot_id].state = 'cycle'
+            # self.slots[slot_id].cycle_total = int(data['cycles'] if data['cycles'] != "" else 1)
+            self.log.info("Cycle start on Slot {} settings: {}".format(slot_id + 1, settings))
+            self.device.sendline("n{}\n".format(slot_id + 1))
+            time.sleep(0.1)
+            self.device.sendline("y{} {}\n".format(slot_id + 1, settings))
+
+            return self.respond(request_id, "Cycle start on Slot {} settings: {}".format(slot_id + 1, settings), 200)
 
     def api_stop(self, request_id, slot_id):
         """

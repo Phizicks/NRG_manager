@@ -1,8 +1,7 @@
 import logging
 from typing import List
 
-from modules.states import BattDisconnect, BattDisconnected, Charging, Discharging, Idle, MeasuringIR, MeasuringIR10Sec, \
-    NotSet, State
+from modules.states import Discharging, Idle, NotSet, State, get_state
 
 cRed = "\033[31m"
 cGreen = "\033[32m"
@@ -17,7 +16,7 @@ class CellData:
     """
     Contains slot cell metrics data
     """
-    valid_keys = ['slot_id', 'stage_id', 'voltage', 'current', 'amphour', 'watthour', 'temp', 'timestamp']
+    valid_keys = ['slot_id', 'stage_id', 'stage', 'voltage', 'current', 'amphour', 'watthour', 'temp', 'timestamp']
 
     def __init__(self, values: dict):
         """
@@ -34,33 +33,22 @@ class CellData:
         self._amphour = values['amphour']
         self._watthour = values['watthour']
         self._temp = values['temp']
-        self._stage_id = NotSet
+        self._stage_id = NotSet.value
+        self._stage = NotSet
 
-        # Check if end of a cycle
-        if values['stage_id'] == 1:
-            self._stage_id = Discharging
+        try:
+            self._stage_id = Discharging().value()
+            self._stage = get_state(int(values['stage_id']))
             return
-        if values['stage_id'] == 2:
-            self._stage_id = BattDisconnected
-            return
-        if values['stage_id'] == 3:
-            self._stage_id = Charging
-            return
-        if values['stage_id'] == 4:
-            self._stage_id = BattDisconnect
-            return
-        if values['stage_id'] == 6:
-            self._stage_id = MeasuringIR
-            return
-        if values['stage_id'] == 7:
-            self._stage_id = MeasuringIR10Sec
-            return
-        if values['stage_id'] == 8:
-            self._stage_id = Idle
+        except:
+            self.log.info("{}Failed to set state: {} {}".format(cRed, values['stage_id'], cNorm))
+
+        if int(values['stage_id']) == Idle().value:
+            self._stage_id = Idle().value
+            self._stage = Idle
             self.log.info("{}Slot# {} is now IDLE{}".format(cGreen, self._slot_id, cNorm))
             return
-
-        raise ValueError("stage_id not set")
+        raise ValueError("Invalid stage_id value: {}".format(values['stage_id']))
 
     @property
     def slot_id(self):
@@ -76,8 +64,9 @@ class CellData:
         :param values:
         :return:
         """
-        if any(True for k in self.valid_keys if k not in values):
-            raise ValueError('Missing parameter, expected {}'.format(self.valid_keys))
+        missing = [k for k in self.valid_keys if k not in values ]
+        if missing:
+            raise ValueError('{}Missing parameter(s): {}{}'.format(cRed, missing, cNorm))
 
         if any(True for k in values if k not in self.valid_keys):
             raise ValueError('Unexpected parameter, expected only {}'.format(self.valid_keys))
@@ -92,13 +81,9 @@ class CellData:
 
         :return:
         """
-        # try:
-        self.log.critical("to_json->{}".format(type(self._stage_id)))
         return {
-            i: getattr(self, "_" + i) if 'stage_id' != i else self._stage_id.__name__ for i in self.valid_keys
+            i: getattr(self, "_" + i) if 'stage' != i else self._stage.__name__ for i in self.valid_keys
         }
-        # except Exception as e:
-        #     self.log.critical("OOOF: {} {}".format(self._stage_id, e))
 
 
 class Cell:
@@ -163,7 +148,6 @@ class Cell:
 
         :return:
         """
-        self.log.critical("CellSTATUS: {}".format(self._state))
         return self._state
 
     @state.setter
@@ -183,7 +167,6 @@ class Cell:
             "state": self.state,
             "history": selected[::-1]
         }
-        logging.critical(("SINCE: {}".format(selected)))
         return output
 
 

@@ -50,7 +50,7 @@ def wait_and_get_response(rid):
     response = webqueue[rid].get()
     webqueue[rid].task_done()
     del webqueue[rid]
-    logging.critical("SendingResponse: {}".format(response))
+    logging.debug("SendingResponse: {}".format(response))
     return Response(response['message'], status=response['code'], mimetype=response['mimetype'])
 
 
@@ -82,6 +82,16 @@ def send_css(path):
     :return:
     """
     return send_from_directory('web/css', path)
+
+
+@app.route('/', methods=['GET'])
+@app.route('/<path:path>', methods=['GET'])
+def root(path='index.html'):
+    """
+
+    :return:
+    """
+    return send_from_directory('web', path)
 
 
 @app.route('/api/status/<int:slot_id>', methods=['POST'])
@@ -134,14 +144,40 @@ def api_charge(slot_id):
     return wait_and_get_response(rid)
 
 
-@app.route('/', methods=['GET'])
-@app.route('/<path:path>', methods=['GET'])
-def root(path='index.html'):
+@app.route('/api/cycle/<int:slot_id>', methods=['POST'])
+def api_cycle(slot_id):
     """
 
     :return:
     """
-    return send_from_directory('web', path)
+    payload = json.loads(request.stream.read().decode('utf-8'))
+
+    logging.info("{}Requested: {}{}".format(cMag, request.path, cNorm))
+    if is_comms_busy():
+        return Response("Comms service too busy", status=429)
+
+    rid = get_request()
+    cyclerqueue.put(
+            {'slot_id': slot_id, 'action': 'cycle', 'payload': format_request(payload), 'request_id': rid})
+    return wait_and_get_response(rid)
+
+
+@app.route('/api/discharge/<int:slot_id>', methods=['POST'])
+def api_discharge(slot_id):
+    """
+
+    :return:
+    """
+    payload = json.loads(request.stream.read().decode('utf-8'))
+
+    logging.info("{}Requested: {}{}".format(cMag, request.path, cNorm))
+    if is_comms_busy():
+        return Response("Comms service too busy", status=429)
+
+    rid = get_request()
+    cyclerqueue.put(
+            {'slot_id': slot_id, 'action': 'discharge', 'payload': format_request(payload), 'request_id': rid})
+    return wait_and_get_response(rid)
 
 
 @app.route('/api/history/<int:slot_id>', methods=['GET'])

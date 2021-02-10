@@ -1,6 +1,6 @@
 import logging
 
-logging.getLogger('connectionpool').setLevel(logging.DEBUG)
+logging.getLogger('connectionpool').setLevel(logging.CRITICAL)
 
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -13,4 +13,3 @@ log.addHandler(fileHandler)
 consoleHandler = logging.StreamHandler()
 consoleHandler.setFormatter(logFormatter)
 log.addHandler(consoleHandler)
-

@@ -27,18 +27,18 @@ const config = {
         datasets: [{
             cellid: 1,
             label: 'mV',
-            backgroundColor: '#c04040',
             borderColor: '#c04040',
             data: [],
-            fill: false,
+            fill: false
         }, {
             cellid: 2,
             label: 'mA',
-            fill: false,
-            backgroundColor: '#a0a0c0',
+            backgroundColor: [],
             borderColor: '#a0a0c0',
-            data: []
-        }]
+            data: [],
+            fill: false
+        }],
+        backgroundColor: [],
     },
     options: {
         maintainAspectRatio: false,
@@ -146,12 +146,6 @@ function alert_popup(type, message) {
     }, 5000);
 }
 
-function clear_cell_chart(slot_id) {
-    console.log("Clearing slot #", slot_id);
-    charts[slot_id].clear();
-    charts[slot_id].update();
-}
-
 $('.btn-submit').on('click', function() {
     func = $(this).val();
     serial = JSON.stringify($(this).closest('form').serializeArray());
@@ -198,9 +192,6 @@ $('.btn-submit').on('click', function() {
 
         case 'discharge':
             var cells = []
-//            $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item){
-//                cells.push(item.value)
-//            });
             var curr = $(this).closest('form').find('[name="current"]').val();
             var volt = $(this).closest('form').find('[name="voltage"]').val();
             var coff = $(this).closest('form').find('[name="cutoff"]').val();
@@ -225,8 +216,6 @@ $('.btn-submit').on('click', function() {
 
                 // Clear graphs for cell
                 if (charts[slot_id].data['datasets'].length > parseInt(item.value) ) {
-                    //chart_slot[slot_id].data.datasets[parseInt(item.value)-1].data = Array();
-                    //chart_slot[slot_id].data.labels = Array();
                     charts[slot_id].clear()
                     charts[slot_id].update();
                 }
@@ -236,7 +225,7 @@ $('.btn-submit').on('click', function() {
                     url: "api/" + func+"/" + (parseInt(item.value) -1),
                     data: serial,
                     success: function(response) {
-                        alert_popup('success', response.message);
+                        alert_popup('success', response);
                         cell_update_interval(slot_id);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
@@ -293,22 +282,20 @@ $('.btn-submit').on('click', function() {
                 return;
             }
 
-            $(this).closest('form').find('[name="cell"]:checked').each(function(idx, item) {
+            $(this).closest('form').find('[name="cell"]:checked').each(function(slot_id, item) {
 
                 // Clear graphs for cell
                 if (charts[slot_id].data['datasets'].length > parseInt(item.value) ) {
-                    //chart_slot[slot_id].data.datasets[parseInt(item.value)-1].data = Array();
-                    //chart_slot[slot_id].data.labels = Array();
                     charts[slot_id].clear();
                     charts[slot_id].update();
                 }
                 var slot_id = parseInt(item.value) - 1;
                 $.ajax({
                     type: "POST",
-                    url: "api/" + func+"/" + (parseInt(item.value) -1),
+                    url: "api/" + func+"/" + slot_id,
                     data: serial,
                     success: function(response) {
-                        alert_popup('success', response.message);
+                        alert_popup('success', response);
                         cell_update_interval(slot_id);
                     }
                 }).fail( function(jqXHR, textStatus, errorThrown) {
@@ -379,6 +366,7 @@ function get_slot_update(slot_id) {
         console.log(response.data);
             if (response.data.length>0 && slot_id != response.data[0].slot_id ) {
                 console.log("CRITICAL: Interval_slot_id mismatch to response.data['slot_id']");
+                return;
             }
             var date = new Date();
             var timeString = date.toISOString().substr(11, 8);
@@ -409,7 +397,16 @@ function addCellData(slot_id, values) {
     $('.current .slot'+slot_id+'.text-value').text(values['current']);
     $('.temp .slot'+slot_id+'.text-value').text(values['temp']);
     $('.amphours .slot'+slot_id+'.text-value').text(values['amphour']);
-    $('.stage_id .slot'+slot_id+'.text-value').text(values['stage_id']);
+    $('.stage_id .slot'+slot_id+'.text-value').text(values['stage']);
+}
+
+function clear_cell_chart(slot_id) {
+    console.log("Clearing slot #", slot_id);
+    charts[slot_id].data.datasets[0].data = [];
+    charts[slot_id].data.datasets[1].data = [];
+    charts[slot_id].data.labels = [];
+    charts[slot_id].clear();
+    charts[slot_id].update();
 }
 
 function add_slot_data_to_chart(data) {
@@ -417,7 +414,6 @@ function add_slot_data_to_chart(data) {
 
     // Add data to cell charts
     addCellData(slot_id, data);
-
     charts[slot_id].data.datasets[0].data.push(data['voltage']);
     charts[slot_id].data.datasets[1].data.push(data['current']);
     const timestamp = new Date(data['timestamp']*1000)
@@ -426,18 +422,7 @@ function add_slot_data_to_chart(data) {
     charts[slot_id].update();
 }
 
-//$('#status_stop').on('click', function() {
-//    // stop_cell_interval()
-//    var slot_id = 0;
-//    $.ajax({
-//        type: "POST",
-//        url: "api/history/"+slot_id,
-//        data: '[{"name":"action","value":"history"}]',
-//        success: function(response) {
-////                console.log(response.message);
-//            $.each(response.message, function(_, values) {
-//                add_slot_data_to_chart(slot_id, values);
-//            });
-//        }
-//    });
-//});
+$('#clear').on('click', function() {
+    var slot_id = parseInt(this.value);
+    clear_cell_chart(slot_id);
+});

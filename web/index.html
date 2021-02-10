@@ -194,8 +194,8 @@
                   <input type='text' name='cutoffmv' size='4' maxlength='4' placeholder='2700'> Cutoff Voltage
                 </li>
                 <li class="nav-item">
-                  <input type="radio" class='select-cell' name="mode" value='cc' selected> Const' Current
-                  <input type="radio" class='select-cell' name="mode" value='stepped'> Stepped
+                  <input type="radio" class='select-cell' name="mode" value='0' selected> Const' Current
+                  <input type="radio" class='select-cell' name="mode" value='1'> Stepped
                 </li>
                 <li class="nav-item">
                   <input type='hidden' name="action" class='btn-submit bg-box' value='discharge'>
@@ -325,10 +325,7 @@
                 </li>
               </ul>
             </li>
-            <input type='button' id='addData' value='addData'>
-            <input type='button' id='delData' value='delData'>
-            <input type='button' id='status' value='status'>
-            <input type='button' id='status_stop' value='status stop'>
+            <input id='clear' type='button' value='0'>
           </ul>
         </nav>
         <button class="sidebar-minimizer brand-minimizer" type="button"></button>
@@ -581,12 +578,12 @@
                     <div class="btn-group btn-group-toggle float-right mr-1" data-toggle="buttons">
                       <label class="btn btn-outline-secondary">
                         Charge mV <input type="text" name="options" autocomplete="off">
-                      </label>
+                      </label><br/>
                       <label class="btn btn-outline-secondary">
                         Charge mA <input type="text" name="options" autocomplete="off">
-                      </label>
+                      </label><br/>
                       <label class="btn btn-outline-secondary">
-                        <input id="option3" type="text" name="options" autocomplete="off"> Year
+                        <input id="option4" type="text" name="options" autocomplete="off"> Year
                       </label>
                     </div>
                     <button class="btn btn-primary float-right" type="button">
