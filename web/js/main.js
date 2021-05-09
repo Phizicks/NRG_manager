@@ -423,7 +423,8 @@ function add_slot_data_to_chart(data) {
     charts[slot_id].update();
 }
 
-$('#clear').on('click', function() {
+$('.clear').on('click', function() {
+
     var slot_id = parseInt(this.value);
     clear_cell_chart(slot_id);
 });
