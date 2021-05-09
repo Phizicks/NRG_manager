@@ -160,7 +160,7 @@ $('.btn-submit').on('click', function() {
                 return;
             }
             if ( curr != "" && (curr < 100 || curr > 6000) ) {
-                alert_popup('danger', "'Charge current' outside of range [100 >= value <= 1500]");
+                alert_popup('danger', "'Charge current' outside of range [100 >= value <= 6000]");
                 return;
             }
             if ( volt != "" && (volt < 2400 || volt > 4500) ) {
@@ -192,6 +192,7 @@ $('.btn-submit').on('click', function() {
 
         case 'discharge':
             var cells = []
+            var mode = $(this).closest('form').find('[name="mode"]:checked').val();
             var curr = $(this).closest('form').find('[name="current"]').val();
             var volt = $(this).closest('form').find('[name="voltage"]').val();
             var coff = $(this).closest('form').find('[name="cutoff"]').val();
@@ -199,16 +200,16 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "You must select at least 1 Cell");
                 return;
             }
-            if ( discma != "" && (discma < 100 || discma > 1500) ) {
-                alert_popup('danger', "'Discharge current' outside of range [100 >= value <= 1500]");
+            if ( discma != "" && (discma < 100 || discma > 6000) ) {
+                alert_popup('danger', "'Discharge current' outside of range [100 >= value <= 6000]");
                 return;
             }
-            if ( cutoffmv != "" && (cutoffmv < 1000 || cutoffmv > 3900) ) {
-                alert_popup('danger', "'Cutoff voltage' outside of range [1000 >= value <= 3900]");
+            if ( cutoffmv != "" && (cutoffmv < 700 || cutoffmv > 3900) ) {
+                alert_popup('danger', "'Cutoff voltage' outside of range [700 >= value <= 3900]");
                 return;
             }
 
-            if ( typeof mode != "undefined" && mode !='cc' && mode > 'stepped' ) {
+            if ( typeof mode != "undefined" && mode !='0' && mode != '1' ) {
                 alert_popup('danger', "'Mode' must be of Constant Current or Stepped mode");
                 return;
             }
@@ -257,11 +258,11 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "'Discharge current' outside of range [100 >= value <= 1500]");
                 return;
             }
-            if ( cutoffmv != "" && (cutoffmv < 1000 || cutoffmv > 3900) ) {
-                alert_popup('danger', "'Cutoff voltage' outside of range [1000 >= value <= 3900]");
+            if ( cutoffmv != "" && (cutoffmv < 700 || cutoffmv > 3900) ) {
+                alert_popup('danger', "'Cutoff voltage' outside of range [700 >= value <= 3900]");
                 return;
             }
-            if ( typeof mode != "undefined" && mode !='cc' && mode > 'stepped' ) {
+            if ( typeof mode != "undefined" && mode !='0' && mode > '1' ) {
                 alert_popup('danger', "'Mode' must be of Constant Current or Stepped mode");
                 return;
             }
@@ -277,8 +278,8 @@ $('.btn-submit').on('click', function() {
                 alert_popup('danger', "'Cutoff Current' outside of range [50 >= value <= 250]");
                 return;
             }
-            if ( cycles != "" && (cycles < 1 || cutoffma > 5000) ) {
-                alert_popup('danger', "'Cutoff Current' outside of range [50 >= value <= 250]");
+            if ( cycles != "" && (cycles < 1 || cycles > 5000) ) {
+                alert_popup('danger', "'Cutoff Current' outside of range [50 >= value <= 5000]");
                 return;
             }
 
